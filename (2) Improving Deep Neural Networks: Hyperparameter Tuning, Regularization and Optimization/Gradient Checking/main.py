@@ -1,0 +1,272 @@
+# In this assignment you will learn to implement and use gradient checking.
+
+# You are part of a team working to make mobile payments available globally, and are 
+#   asked to build a deep learning model to detect fraud--whenever someone makes a 
+#   payment, you want to see if the payment might be fraudulent, such as if the user's 
+#   account has been taken over by a hacker.
+#
+# But backpropagation is quite challenging to implement, and sometimes has bugs. 
+# Because this is a mission-critical application, your company's CEO wants to be really 
+#   certain that your implementation of backpropagation is correct. 
+#   Your CEO says, "Give me a proof that your backpropagation is actually working!" 
+# To give this reassurance, you are going to use "gradient checking".
+#
+# Let's do it!
+
+# Packages
+import numpy as np
+from testCases import *
+from gc_utils import sigmoid, relu, dictionary_to_vector, vector_to_dictionary, gradients_to_vector
+
+
+# Backpropagation computes the gradients ∂J/∂θ, where θ denotes the parameters of the model. 
+# J is computed using forward propagation and your loss function.
+#
+# Because forward propagation is relatively easy to implement, you're confident you got 
+#   that right, and so you're almost 100% sure that you're computing the cost J correctly. 
+# Thus, you can use your code for computing J to verify the code for computing ∂J/∂θ.
+# 
+# Definition of derivative
+#   ∂J/∂θ = lim[ε→0]  ( J(θ+ε) − J(θ−ε) ) / 2ε
+# 
+# We know the following:
+#   ∂J/∂θ is what you want to make sure you're computing correctly. 
+#   You can compute J(θ+ε) and J(θ−ε) (in the case that θ is a real number), 
+#       since you're confident your implementation for J is correct. 
+#
+
+# Consider a 1D linear function J(θ)=θxJ(θ)=θx. 
+# The model contains only a single real-valued parameter θθ, and takes xx as input.
+def forward_propagation(x, theta):
+    """
+    Implement the linear forward propagation (compute J) presented in Figure 1 (J(theta) = theta * x)
+    
+    Arguments:
+    x -- a real-valued input
+    theta -- our parameter, a real number as well
+    
+    Returns:
+    J -- the value of function J, computed using the formula J(theta) = theta * x
+    """
+    
+    J = theta * x
+    
+    return J
+
+def backward_propagation(x, theta):
+    """
+    Computes the derivative of J with respect to theta (see Figure 1).
+    
+    Arguments:
+    x -- a real-valued input
+    theta -- our parameter, a real number as well
+    
+    Returns:
+    dtheta -- the gradient of the cost with respect to theta
+    """
+    
+    dtheta = x
+    
+    return dtheta
+
+
+
+
+# Compute de approximated gradient using the definition of derivative.
+# Calculate the difference between the obtained back prop and the approximation.
+def gradient_check(x, theta, epsilon = 1e-7):
+    """
+    Implement the backward propagation presented in Figure 1.
+    
+    Arguments:
+    x -- a real-valued input
+    theta -- our parameter, a real number as well
+    epsilon -- tiny shift to the input to compute approximated gradient with formula(1)
+    
+    Returns:
+    difference -- difference (2) between the approximated gradient and the backward propagation gradient
+    """
+    
+    # Compute gradapprox using left side of formula (1). epsilon is small enough, you don't need to worry about the limit.
+    thetaplus = theta + epsilon
+    thetaminus = theta - epsilon
+    J_plus = forward_propagation(x, thetaplus)
+    J_minus = forward_propagation(x, thetaminus)
+    gradapprox = ( J_plus - J_minus ) / (2 * epsilon)
+    
+    # Check if gradapprox is close enough to the output of backward_propagation()
+    grad = backward_propagation(x, theta)
+    
+    numerator = np.linalg.norm(grad - gradapprox)
+    denominator = np.linalg.norm(grad) + np.linalg.norm(gradapprox)
+    difference = numerator / denominator
+    
+    # the difference is irrelevant.
+    if difference < 1e-7:
+        print ("The gradient is correct!")
+    else:
+        print ("The gradient is wrong!")
+    
+    return difference
+
+
+# Check if it is working
+x, theta = 2, 4
+difference = gradient_check(x, theta)
+print("difference = " + str(difference))
+
+
+
+def forward_propagation_n(X, Y, parameters):
+    """
+    Implements the forward propagation (and computes the cost) presented in Figure 3.
+    
+    Arguments:
+    X -- training set for m examples
+    Y -- labels for m examples 
+    parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3":
+                    W1 -- weight matrix of shape (5, 4)
+                    b1 -- bias vector of shape (5, 1)
+                    W2 -- weight matrix of shape (3, 5)
+                    b2 -- bias vector of shape (3, 1)
+                    W3 -- weight matrix of shape (1, 3)
+                    b3 -- bias vector of shape (1, 1)
+    
+    Returns:
+    cost -- the cost function (logistic cost for one example)
+    """
+    
+    # retrieve parameters
+    m = X.shape[1]
+    W1 = parameters["W1"]
+    b1 = parameters["b1"]
+    W2 = parameters["W2"]
+    b2 = parameters["b2"]
+    W3 = parameters["W3"]
+    b3 = parameters["b3"]
+
+    # LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SIGMOID
+    Z1 = np.dot(W1, X) + b1
+    A1 = relu(Z1)
+    Z2 = np.dot(W2, A1) + b2
+    A2 = relu(Z2)
+    Z3 = np.dot(W3, A2) + b3
+    A3 = sigmoid(Z3)
+
+    # Cost
+    logprobs = np.multiply(-np.log(A3),Y) + np.multiply(-np.log(1 - A3), 1 - Y)
+    cost = 1./m * np.sum(logprobs)
+    
+    cache = (Z1, A1, W1, b1, Z2, A2, W2, b2, Z3, A3, W3, b3)
+    
+    return cost, cache
+
+
+
+def backward_propagation_n(X, Y, cache):
+    """
+    Implement the backward propagation presented in figure 2.
+    
+    Arguments:
+    X -- input datapoint, of shape (input size, 1)
+    Y -- true "label"
+    cache -- cache output from forward_propagation_n()
+    
+    Returns:
+    gradients -- A dictionary with the gradients of the cost with respect to each parameter, activation and pre-activation variables.
+    """
+    
+    m = X.shape[1]
+    (Z1, A1, W1, b1, Z2, A2, W2, b2, Z3, A3, W3, b3) = cache
+    
+    dZ3 = A3 - Y
+    dW3 = 1./m * np.dot(dZ3, A2.T)
+    db3 = 1./m * np.sum(dZ3, axis=1, keepdims = True)
+    
+    dA2 = np.dot(W3.T, dZ3)
+    dZ2 = np.multiply(dA2, np.int64(A2 > 0))
+    dW2 = 1./m * np.dot(dZ2, A1.T)
+    db2 = 1./m * np.sum(dZ2, axis=1, keepdims = True)
+    
+    dA1 = np.dot(W2.T, dZ2)
+    dZ1 = np.multiply(dA1, np.int64(A1 > 0))
+    dW1 = 1./m * np.dot(dZ1, X.T)
+    db1 = 1./m * np.sum(dZ1, axis=1, keepdims = True)
+    
+    gradients = {"dZ3": dZ3, "dW3": dW3, "db3": db3,
+                 "dA2": dA2, "dZ2": dZ2, "dW2": dW2, "db2": db2,
+                 "dA1": dA1, "dZ1": dZ1, "dW1": dW1, "db1": db1}
+    
+    return gradients
+
+
+
+
+
+
+# Now that we have forward and backward prop functions, let's do a gradient check on
+#   a multi-dimensional array.
+def gradient_check_n(parameters, gradients, X, Y, epsilon = 1e-7):
+    """
+    Checks if backward_propagation_n computes correctly the gradient of the cost output by forward_propagation_n
+    
+    Arguments:
+    parameters -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3":
+    grad -- output of backward_propagation_n, contains gradients of the cost with respect to the parameters. 
+    x -- input datapoint, of shape (input size, 1)
+    y -- true "label"
+    epsilon -- tiny shift to the input to compute approximated gradient with formula(1)
+    
+    Returns:
+    difference -- difference (2) between the approximated gradient and the backward propagation gradient
+    """
+    
+    # Set-up variables
+    parameters_values, _ = dictionary_to_vector(parameters)
+    grad = gradients_to_vector(gradients)
+    num_parameters = parameters_values.shape[0]
+    J_plus = np.zeros((num_parameters, 1))
+    J_minus = np.zeros((num_parameters, 1))
+    gradapprox = np.zeros((num_parameters, 1))
+    
+    # Compute gradapprox
+    for i in range(num_parameters):
+        
+        # Compute J_plus[i]. Inputs: "parameters_values, epsilon". Output = "J_plus[i]".
+        # "_" is used because the function you have to outputs two parameters but we only care about the first one
+        thetaplus = np.copy(parameters_values)                                      
+        thetaplus[i][0] = thetaplus[i][0] + epsilon                                
+        J_plus[i], _ = forward_propagation_n(X, Y, vector_to_dictionary(thetaplus))                                   
+        
+        # Compute J_minus[i]. Inputs: "parameters_values, epsilon". Output = "J_minus[i]".
+        thetaminus = np.copy(parameters_values)                           
+        thetaminus[i][0] = thetaminus[i][0] - epsilon                                      
+        J_minus[i], _ = forward_propagation_n(X, Y, vector_to_dictionary(thetaminus))                                  
+        
+        # Compute gradapprox[i]
+        gradapprox[i] = (J_plus[i] - J_minus[i]) / (2 * epsilon)
+        
+    
+    # Compare gradapprox to backward propagation gradients by computing difference.
+    numerator = np.linalg.norm(grad - gradapprox)  
+    denominator = np.linalg.norm(grad) + np.linalg.norm(gradapprox) 
+    difference = numerator / denominator                                          
+
+    if difference > 2e-7:
+        print ("\033[93m" + "There is a mistake in the backward propagation! difference = " + str(difference) + "\033[0m")
+    else:
+        print ("\033[92m" + "Your backward propagation works perfectly fine! difference = " + str(difference) + "\033[0m")
+    
+    return difference
+
+
+# Testing
+X, Y, parameters = gradient_check_n_test_case()
+
+cost, cache = forward_propagation_n(X, Y, parameters)
+gradients = backward_propagation_n(X, Y, cache)
+difference = gradient_check_n(parameters, gradients, X, Y)
+
+
+
+# Onde está o bug no código da back-prop?
